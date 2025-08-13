@@ -108,7 +108,7 @@ function M.setup(opts)
 
   if opts ~= nil and opts.user_default then
     config = vim.tbl_deep_extend('force', { vim.opt.listchars:get() }, opts)
-  else
+  elseif opts ~= nil then
     config = vim.tbl_deep_extend('force', config, opts)
   end
 
