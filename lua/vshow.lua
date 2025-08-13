@@ -1,117 +1,125 @@
-local DEFAULT_CONFIG = {
-  all = {
-    { character = 'eol', symbol = '' },
-    { character = 'tab', symbol = '> ' },
-    { character = 'space', symbol = '' },
-    { character = 'multispace', symbol = '' },
-    { character = 'lead', symbol = '' },
-    { character = 'trail', symbol = '-' },
-    { character = 'extends', symbol = '' },
-    { character = 'precedes', symbol = '' },
-    { character = 'precedes', symbol = '' },
-    { character = 'conceal', symbol = '' },
-    { character = 'nbsp', symbol = '+' },
+local M = {}
+
+M.CHAR_VISUAL_MODE = 'v'
+M.LINE_VISUAL_MODE = 'V'
+M.BLOCK_VISUAL_MODE = '\22'
+M.VISUAL_MODES = M.CHAR_VISUAL_MODE .. M.LINE_VISUAL_MODE .. M.BLOCK_VISUAL_MODE
+
+---@class vshow.Configuration
+---@field [1]? vshow.Listchars Settings applying to all visual modes
+---@field char? vshow.Listchars Character-wise visual mode settings
+---@field line? vshow.Listchars Line-wise visual mode settings
+---@field block? vshow.Listchars Block-wise visual mode settings
+---@field user_default? boolean Use user-defined listchars instead of Neovim's default listchars (default: false)
+
+---@class vshow.Listchars
+---@field eol? string
+---@field tab? string
+---@field space? string
+---@field multispace? string
+---@field lead? string
+---@field leadmultispace? string
+---@field trail? string
+---@field extends? string
+---@field precedes? string
+---@field conceal? string
+---@field nbsp? string
+
+---@type vshow.Configuration
+local config = {
+  {
+    tab = '> ',
+    trail = '-',
+    nbsp = '+',
   },
-  char = {},
-  line = {},
-  block = {},
 }
 
-local _config = {}
-
----@return table A deep copy of config
-local function get_config()
-  return vim.deepcopy(_config)
-end
-
----@param user_config table|nil Configuration to merge with the default configuration
----@return table Merged configuration table
-local function merge_configs(user_config)
-  if not user_config then
-    return vim.deepcopy(DEFAULT_CONFIG)
-  else
-    return vim.tbl_deep_extend('force', DEFAULT_CONFIG, user_config)
-  end
-end
-
----@param config table
-local function setup_autocmds(config)
-  local old_list
-  local old_listchars
-  local vshow_group_id = vim.api.nvim_create_augroup('vshow.lua', { clear = true })
-
-  ---@param listchars table Existing listchars to update
-  ---@param mode_settings table[] Data to update listchars
-  ---@return table Updated listchars
-  local function make_listchars(listchars, mode_settings)
-    for _, setting in ipairs(mode_settings) do
-      if setting.symbol ~= '' then
-        if type(setting.character) == 'string' then
-          listchars[setting.character] = setting.symbol
+-- Merges the tables similar to vim.tbl_deep_extend with the **force** behavior, but removes values set to 0
+---@generic T
+---@param ... T
+---@return T
+local function merge(...)
+  local ret = select(1, ...)
+  for i = 2, select('#', ...) do
+    local value = select(i, ...)
+    if type(value) == 'table' then
+      for k, v in pairs(value) do
+        if v == 0 then
+          ret[k] = nil
         else
-          for _, char in ipairs(setting.character) do
-            listchars[char] = setting.symbol
-          end
+          ret[k] = merge(ret[k], v)
         end
       end
+    elseif value ~= nil then
+      ret = value
     end
-    return listchars
+  end
+  return ret
+end
+
+---@param autocmd_tbl table See nvim_create_autocmd() documentation for details
+local function on_mode_changed(autocmd_tbl)
+  local previous_mode, current_mode = autocmd_tbl.match:match('([^:]+):([^:]+)')
+  local is_previous_mode_visual = string.find(M.VISUAL_MODES, previous_mode) ~= nil
+  local is_current_mode_visual = string.find(M.VISUAL_MODES, current_mode) ~= nil
+
+  if not is_previous_mode_visual and not is_current_mode_visual then
+    return
   end
 
-  local function on_mode_changed(autocmd_tbl)
-    local VISUAL_MODES = 'vV\x16'
-    local previous_mode = string.sub(autocmd_tbl.match, 1, string.find(autocmd_tbl.match, ':') - 1)
-    local current_mode = string.sub(autocmd_tbl.match, string.find(autocmd_tbl.match, ':') + 1, -1)
-    local is_previous_mode_visual = string.find(VISUAL_MODES, previous_mode)
-    local is_current_mode_visual = string.find(VISUAL_MODES, current_mode)
-
-    if not is_previous_mode_visual and not is_current_mode_visual then
-      return
-    end
-
-    if is_previous_mode_visual and not is_current_mode_visual then
-      vim.opt_local.listchars = old_listchars
-      vim.opt_local.list = old_list
-      return
-    end
-
-    if not is_previous_mode_visual then
-      old_list = vim.opt_local.list
-      old_listchars = vim.opt_local.listchars
-    end
-
-    local new_listchars = make_listchars({}, config[1] or config.all)
-    if current_mode == 'v' then
-      new_listchars = make_listchars(new_listchars, config.char)
-    elseif current_mode == 'V' then
-      new_listchars = make_listchars(new_listchars, config.line)
-    else -- '^V'
-      new_listchars = make_listchars(new_listchars, config.block)
-    end
-
-    vim.opt_local.list = true
-    vim.opt_local.listchars = new_listchars
+  -- Restore old listchars settings
+  if is_previous_mode_visual and not is_current_mode_visual then
+    vim.opt_local.list = M.old_list or vim.opt.list:get()
+    vim.opt_local.listchars = M.old_listchars or vim.opt.listchars:get()
+    return
   end
 
+  -- Save old listchars settings
+  if not is_previous_mode_visual then
+    -- For some reason LSP is giving a warning that :get() is an undefined field
+    ---@diagnostic disable-next-line: undefined-field
+    M.old_list = vim.opt_local.list:get()
+    ---@diagnostic disable-next-line: undefined-field
+    M.old_listchars = vim.opt_local.listchars:get()
+  end
+
+  ---@type vshow.Listchars
+  local listchars = vim.deepcopy(config[1]) or {}
+  if current_mode == 'v' and config.char ~= nil then
+    listchars = merge(listchars, config.char)
+  elseif current_mode == 'V' and config.line ~= nil then
+    listchars = merge(listchars, config.line)
+  elseif current_mode == '\22' and config.block ~= nil then
+    listchars = merge(listchars, config.block)
+  end
+
+  vim.opt_local.list = true
+  vim.opt_local.listchars = listchars
+end
+
+---Characters `:` and `,` should not be used as symbols
+---All characters used as symbols must be single width
+---@param opts vshow.Configuration?
+function M.setup(opts)
+  if M.did_setup then
+    return vim.notify('vshow.nvim is already setup', vim.log.levels.ERROR, { title = 'vshow.nvim' })
+  end
+  M.did_setup = true
+
+  if opts ~= nil and opts.user_default then
+    config = vim.tbl_deep_extend('force', { vim.opt.listchars:get() }, opts)
+  else
+    config = vim.tbl_deep_extend('force', config, opts)
+  end
+
+  local vshow_group_id = vim.api.nvim_create_augroup('vshow.lua', { clear = true })
+
+  -- It's not possible to make a more specific pattern without alternatives which are not available in Lua
   vim.api.nvim_create_autocmd('ModeChanged', {
     pattern = '*:*',
     callback = on_mode_changed,
     group = vshow_group_id,
   })
-
 end
 
----Characters `:` and `,` should not be used as symbols
----All characters used as symbols must be single width
----@param user_config table|nil
-local function setup(user_config)
-  _config = merge_configs(user_config)
-  setup_autocmds(_config)
-end
-
-local vshow = {
-  setup = setup,
-  get_config = get_config,
-}
-
-return vshow
+return M

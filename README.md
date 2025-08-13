@@ -1,6 +1,7 @@
 # vshow.nvim
 
-Configurable Neovim plugin for showing whitespace in visual mode that abstracts away setting up autocommands (and maybe more in the future).
+Configurable Neovim plugin for showing whitespace in visual mode that
+abstracts away setting up autocommands (and maybe more in the future).
 
 ## Features
 
@@ -9,7 +10,7 @@ Configurable Neovim plugin for showing whitespace in visual mode that abstracts 
 
 ## Installation
 
-To install with [packer.nvim](https://github.com/wbthomason/packer.nvim):
+To install with [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 use 'oxtna/vshow.nvim'
@@ -31,61 +32,84 @@ inside a vim file:
 require('vshow').setup()
 ```
 
-If you're using [packer.nvim](https://github.com/wbthomason/packer.nvim),
-you can setup `vshow` inside the plugin spec:
+If you're using [lazy.nvim](https://github.com/folke/lazy.nvim),
+you can setup `vshow` by creating `vshow.lua` in your plugin directory
+with the following content:
 
 ```lua
-use {
-  'oxtna/vshow.nvim',
-  config = function()
-    require('vshow').setup()
-  end
+return {
+  {
+    'oxtna/vshow.nvim',
+    event = 'VimEnter',
+    config = function()
+      require('vshow').setup()
+    end,
+  }
 }
 ```
 
-To change `vshow`'s behavior, pass the configuration table to the setup function:
+To change `vshow`'s behavior, pass the configuration table to the setup,
+like so:
 
 ```lua
 require('vshow').setup({
   {
-    { character = { 'space', 'nbsp' }, symbol = '•' },
-    { character = 'tab', symbol = '>•' },
+    space = '•',
+    nbsp = '+',
+    tab = '>•',
   },
   line = {
-    { character = 'multispace', symbol = '|•' },
+    multispace = '|•',
+    eol = '$',
   },
+  user_default = true,
 })
 ```
 
 ## Configuration
 
-For the complete list of available configuration options, check [:help vshow.nvim](doc/vshow.txt)
+`vshow` uses Neovim's built-in *listchars*, so all characters and character
+groups are the same as *listchars* keys. To see the whole list of possible keys,
+see [:help listchars](https://neovim.io/doc/user/options.html#'listchars').
 
-Here is a list with all of the default options:
+To use the user's *listchars* as the default base generic configuration instead
+of `vshow`'s default base configuration (which is the same as Neovim's default),
+set the `user_default` flag to `true` in the configuration table passed to the
+`setup` function. Its value is `false` by default.
+
+Here is a list with `vshow`'s default options:
 
 ```lua
-require('vshow').setup({
-  all = {
-    { character = 'eol', symbol = '' },
-    { character = 'tab', symbol = '> ' },
-    { character = 'space', symbol = '' },
-    { character = 'multispace', symbol = '' },
-    { character = 'lead', symbol = '' },
-    { character = 'trail', symbol = '-' },
-    { character = 'extends', symbol = '' },
-    { character = 'precedes', symbol = '' },
-    { character = 'precedes', symbol = '' },
-    { character = 'conceal', symbol = '' },
-    { character = 'nbsp', symbol = '+' },
+local config = {
+  {
+    tab = '> ',
+    trail = '-',
+    nbsp = '+',
   },
-  char = {},
-  line = {},
-  block = {},
-})
+}
 ```
 
 Mode-specific settings overwrite generic settings for all modes.
 
-Warning:
-At the moment, due to implementation details, the `1` key in the configuration table takes precedence over the `all` key, ignoring any settings in the `all` key.
+To make a character invisible for all modes, set its assigned value to `0` in
+the configuration table for all modes, like so:
+
+```lua
+require('vshow').setup({
+  {
+    tab = 0,
+  },
+})
+```
+
+To make a character invisible for a specific mode, set its assigned value to `0`
+in the configuration table of that mode, like so:
+
+```lua
+require('vshow').setup({
+  line = {
+    tab = 0,
+  },
+})
+```
 
