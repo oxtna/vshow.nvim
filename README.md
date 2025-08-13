@@ -10,10 +10,19 @@ abstracts away setting up autocommands (and maybe more in the future).
 
 ## Installation
 
-To install with [lazy.nvim](https://github.com/folke/lazy.nvim):
+To install with [lazy.nvim](https://github.com/folke/lazy.nvim), create
+`vshow.lua` in your plugin directory and put the following content into it:
 
 ```lua
-use 'oxtna/vshow.nvim'
+return {
+  {
+    'oxtna/vshow.nvim',
+    event = 'VimEnter',
+    config = function()
+      require('vshow').setup()
+    end,
+  }
+}
 ```
 
 To install with [vim-plug](https://github.com/junegunn/vim-plug):
@@ -30,22 +39,6 @@ inside a vim file:
 
 ```lua
 require('vshow').setup()
-```
-
-If you're using [lazy.nvim](https://github.com/folke/lazy.nvim),
-you can setup `vshow` by creating `vshow.lua` in your plugin directory
-with the following content:
-
-```lua
-return {
-  {
-    'oxtna/vshow.nvim',
-    event = 'VimEnter',
-    config = function()
-      require('vshow').setup()
-    end,
-  }
-}
 ```
 
 To change `vshow`'s behavior, pass the configuration table to the setup,
@@ -68,8 +61,8 @@ require('vshow').setup({
 
 ## Configuration
 
-`vshow` uses Neovim's built-in *listchars*, so all characters and character
-groups are the same as *listchars* keys. To see the whole list of possible keys,
+`vshow` uses Neovim's built-in *listchars*, so all keys and values are
+the same as *listchars*. To see the whole list of possible keys and values,
 see [:help listchars](https://neovim.io/doc/user/options.html#'listchars').
 
 To use the user's *listchars* as the default base generic configuration instead
